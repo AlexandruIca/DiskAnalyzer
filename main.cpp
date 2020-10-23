@@ -21,47 +21,48 @@ namespace exit_kind {
 constexpr int success = EXIT_SUCCESS;
 constexpr int failure = EXIT_FAILURE;
 
-}  // namespace exit_kind
+} // namespace exit_kind
 
 namespace {
 
-auto catch_function(int const signo) -> void {
+auto catch_function(int const signo) -> void
+{
     syslog(LOG_ERR, "Received signal: %d", signo);
     std::exit(exit_kind::failure);
 }
 
-}  // namespace
+} // namespace
 
-#define CATCH(sig)                                                            \
-    if (signal(sig, &catch_function) == SIG_ERR) {                            \
-        syslog(LOG_ERR,                                                       \
-               "An error occured while setting up signal handler %s!", #sig); \
-        return exit_kind::failure;                                            \
-    }                                                                         \
+#define CATCH(sig)                                                                                                     \
+    if(signal(sig, &catch_function) == SIG_ERR) {                                                                      \
+        syslog(LOG_ERR, "An error occured while setting up signal handler %s!", #sig);                                 \
+        return exit_kind::failure;                                                                                     \
+    }                                                                                                                  \
     static_cast<void>(0)
 
-int main() {
+int main()
+{
     pid_t pid, sid;
 
     pid = fork();
-    if (pid < 0) {
+    if(pid < 0) {
         std::exit(exit_kind::failure);
     }
     // If we got a good PID, then
     // we can exit the parent process
-    if (pid > 0) {
+    if(pid > 0) {
         std::exit(exit_kind::success);
     }
 
-    umask(0);  // to be able to access the filesystem
+    umask(0); // to be able to access the filesystem
 
     // Create a new SID for the child process
     sid = setsid();
-    if (sid < 0) {
+    if(sid < 0) {
         std::exit(exit_kind::failure);
     }
 
-    if ((chdir("/")) < 0) {
+    if((chdir("/")) < 0) {
         std::exit(exit_kind::failure);
     }
 
@@ -86,35 +87,35 @@ int main() {
 
     int socket_fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-    if (socket_fd == -1) {
-        syslog(LOG_ERR, "Cannot create socket!");
+    if(socket_fd == -1) {
+        syslog(LOG_ERR, "Cannot create socket:");
         std::exit(exit_kind::failure);
     }
 
     std::memset(&socket_address, 0, sizeof(socket_address));
 
     socket_address.sin_family = AF_INET;
-    socket_address.sin_port = htons(8080);
+    socket_address.sin_port = htons(5678);
     socket_address.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    if (bind(socket_fd, reinterpret_cast<sockaddr*>(&socket_address),
-             sizeof(socket_address)) == -1) {
+    if(bind(socket_fd, reinterpret_cast<sockaddr*>(&socket_address), sizeof(socket_address)) == -1) {
         syslog(LOG_ERR, "Bind failed!");
+        syslog(LOG_ERR, "%s", strerror(errno));
         close(socket_fd);
         std::exit(exit_kind::failure);
     }
 
     constexpr int max_num_connections = 10;
-    if (listen(socket_fd, max_num_connections) == -1) {
+    if(listen(socket_fd, max_num_connections) == -1) {
         syslog(LOG_ERR, "Listen failed!");
         close(socket_fd);
         std::exit(exit_kind::failure);
     }
 
-    while (true) {
+    while(true) {
         int const connect_fd = accept(socket_fd, nullptr, nullptr);
 
-        if (connect_fd < 0) {
+        if(connect_fd < 0) {
             syslog(LOG_ERR, "Accept failed!");
             close(socket_fd);
             std::exit(exit_kind::failure);
@@ -125,23 +126,24 @@ int main() {
         std::array<std::byte, 1024> buf;
         bool still_reading = true;
 
-        while (still_reading) {
+        while(still_reading) {
             ssize_t num_bytes_read = read(connect_fd, buf.data(), buf.size());
 
-            if (num_bytes_read < 0) {
+            if(num_bytes_read < 0) {
                 syslog(LOG_ERR, "Couln't read from socket %d!", connect_fd);
                 close(connect_fd);
                 close(socket_fd);
                 std::exit(exit_kind::failure);
             }
-            if (num_bytes_read) {
+            if(num_bytes_read) {
                 still_reading = false;
-            } else {
+            }
+            else {
                 syslog(LOG_NOTICE, "Read %ld bytes!", num_bytes_read);
             }
         }
 
-        if (shutdown(connect_fd, SHUT_RDWR) == -1) {
+        if(shutdown(connect_fd, SHUT_RDWR) == -1) {
             syslog(LOG_ERR, "Shutdown failed for socket %d!", connect_fd);
             close(connect_fd);
             close(socket_fd);
