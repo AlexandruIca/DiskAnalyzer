@@ -111,7 +111,6 @@ int main()
         std::exit(exit_kind::failure);
     }
 
-
     while(true) {
         int const connect_fd = accept(socket_fd, nullptr, nullptr);
 
@@ -135,7 +134,7 @@ int main()
                 close(socket_fd);
                 std::exit(exit_kind::failure);
             }
-            if(num_bytes_read) {
+            if(num_bytes_read == 0) {
                 still_reading = false;
             }
             else {
