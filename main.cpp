@@ -99,24 +99,24 @@ int main()
     socket_address.sin_addr.s_addr = htonl(INADDR_ANY);
 
     if(bind(socket_fd, reinterpret_cast<sockaddr*>(&socket_address), sizeof(socket_address)) == -1) {
-        syslog(LOG_ERR, "Bind failed!");
-        syslog(LOG_ERR, "%s", strerror(errno));
+        syslog(LOG_ERR, "Bind failed: %s", strerror(errno));
         close(socket_fd);
         std::exit(exit_kind::failure);
     }
 
     constexpr int max_num_connections = 10;
     if(listen(socket_fd, max_num_connections) == -1) {
-        syslog(LOG_ERR, "Listen failed!");
+        syslog(LOG_ERR, "Listen failed: %s", strerror(errno));
         close(socket_fd);
         std::exit(exit_kind::failure);
     }
+
 
     while(true) {
         int const connect_fd = accept(socket_fd, nullptr, nullptr);
 
         if(connect_fd < 0) {
-            syslog(LOG_ERR, "Accept failed!");
+            syslog(LOG_ERR, "Accept failed: %s", strerror(errno));
             close(socket_fd);
             std::exit(exit_kind::failure);
         }
@@ -130,7 +130,7 @@ int main()
             ssize_t num_bytes_read = read(connect_fd, buf.data(), buf.size());
 
             if(num_bytes_read < 0) {
-                syslog(LOG_ERR, "Couln't read from socket %d!", connect_fd);
+                syslog(LOG_ERR, "Couln't read from socket %d: %s", connect_fd, strerror(errno));
                 close(connect_fd);
                 close(socket_fd);
                 std::exit(exit_kind::failure);
@@ -144,7 +144,7 @@ int main()
         }
 
         if(shutdown(connect_fd, SHUT_RDWR) == -1) {
-            syslog(LOG_ERR, "Shutdown failed for socket %d!", connect_fd);
+            syslog(LOG_ERR, "Shutdown failed for socket %d: %s", connect_fd, strerror(errno));
             close(connect_fd);
             close(socket_fd);
             std::exit(exit_kind::failure);
