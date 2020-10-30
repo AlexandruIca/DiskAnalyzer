@@ -1,5 +1,4 @@
 #include <arpa/inet.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -9,6 +8,7 @@
 #include <unistd.h>
 
 #include <array>
+#include <cerrno>
 #include <csignal>
 #include <cstddef>
 #include <cstdio>
@@ -40,9 +40,10 @@ auto catch_function(int const signo) -> void
     }                                                                                                                  \
     static_cast<void>(0)
 
-int main()
+auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> int
 {
-    pid_t pid, sid;
+    pid_t pid = 0;
+    pid_t sid = 0;
 
     pid = fork();
     if(pid < 0) {
@@ -72,18 +73,18 @@ int main()
 
     openlog("da_daemon", LOG_PID, LOG_DAEMON);
 
-    CATCH(SIGCHLD);
-    CATCH(SIGQUIT);
-    CATCH(SIGILL);
-    CATCH(SIGSEGV);
-    CATCH(SIGTERM);
-    CATCH(SIGABRT);
-    CATCH(SIGFPE);
-    CATCH(SIGHUP);
+    CATCH(SIGCHLD); // NOLINT
+    CATCH(SIGQUIT); // NOLINT
+    CATCH(SIGILL);  // NOLINT
+    CATCH(SIGSEGV); // NOLINT
+    CATCH(SIGTERM); // NOLINT
+    CATCH(SIGABRT); // NOLINT
+    CATCH(SIGFPE);  // NOLINT
+    CATCH(SIGHUP);  // NOLINT
 
     syslog(LOG_NOTICE, "Work started!");
 
-    sockaddr_in socket_address;
+    sockaddr_in socket_address{};
 
     int socket_fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
@@ -122,7 +123,7 @@ int main()
 
         syslog(LOG_NOTICE, "Accepted socket %d!", connect_fd);
 
-        std::array<std::byte, 1024> buf;
+        std::array<std::byte, 1024> buf{};
         bool still_reading = true;
 
         while(still_reading) {
