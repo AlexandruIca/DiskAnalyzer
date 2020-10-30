@@ -16,6 +16,8 @@
 #include <cstring>
 #include <string>
 
+#include "log.hpp"
+
 namespace exit_kind {
 
 constexpr int success = EXIT_SUCCESS;
@@ -27,7 +29,7 @@ namespace {
 
 auto catch_function(int const signo) -> void
 {
-    syslog(LOG_ERR, "Received signal: %d", signo);
+    ERROR("Received signal: %d", signo);
     std::exit(exit_kind::failure);
 }
 
@@ -35,7 +37,7 @@ auto catch_function(int const signo) -> void
 
 #define CATCH(sig)                                                                                                     \
     if(signal(sig, &catch_function) == SIG_ERR) {                                                                      \
-        syslog(LOG_ERR, "An error occured while setting up signal handler %s!", #sig);                                 \
+        ERROR("An error occured while setting up signal handler %s!", #sig);                                           \
         return exit_kind::failure;                                                                                     \
     }                                                                                                                  \
     static_cast<void>(0)
@@ -82,14 +84,14 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> 
     CATCH(SIGFPE);  // NOLINT
     CATCH(SIGHUP);  // NOLINT
 
-    syslog(LOG_NOTICE, "Work started!");
+    INFO("Work started!");
 
     sockaddr_in socket_address{};
 
     int socket_fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     if(socket_fd == -1) {
-        syslog(LOG_ERR, "Cannot create socket:");
+        ERROR("Cannot create socket!");
         std::exit(exit_kind::failure);
     }
 
@@ -100,14 +102,14 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> 
     socket_address.sin_addr.s_addr = htonl(INADDR_ANY);
 
     if(bind(socket_fd, reinterpret_cast<sockaddr*>(&socket_address), sizeof(socket_address)) == -1) {
-        syslog(LOG_ERR, "Bind failed: %s", strerror(errno));
+        ERROR("Bind failed: %s", strerror(errno));
         close(socket_fd);
         std::exit(exit_kind::failure);
     }
 
     constexpr int max_num_connections = 10;
     if(listen(socket_fd, max_num_connections) == -1) {
-        syslog(LOG_ERR, "Listen failed: %s", strerror(errno));
+        ERROR("Listen failed: %s", strerror(errno));
         close(socket_fd);
         std::exit(exit_kind::failure);
     }
@@ -116,12 +118,12 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> 
         int const connect_fd = accept(socket_fd, nullptr, nullptr);
 
         if(connect_fd < 0) {
-            syslog(LOG_ERR, "Accept failed: %s", strerror(errno));
+            ERROR("Accept failed: %s", strerror(errno));
             close(socket_fd);
             std::exit(exit_kind::failure);
         }
 
-        syslog(LOG_NOTICE, "Accepted socket %d!", connect_fd);
+        INFO("Accepted socket %d!", connect_fd);
 
         std::array<std::byte, 1024> buf{};
         bool still_reading = true;
@@ -130,7 +132,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> 
             ssize_t num_bytes_read = read(connect_fd, buf.data(), buf.size());
 
             if(num_bytes_read < 0) {
-                syslog(LOG_ERR, "Couln't read from socket %d: %s", connect_fd, strerror(errno));
+                ERROR("Couln't read from socket %d: %s", connect_fd, strerror(errno));
                 close(connect_fd);
                 close(socket_fd);
                 std::exit(exit_kind::failure);
@@ -139,12 +141,12 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> 
                 still_reading = false;
             }
             else {
-                syslog(LOG_NOTICE, "Read %ld bytes!", num_bytes_read);
+                INFO("Read %ld bytes!", num_bytes_read);
             }
         }
 
         if(shutdown(connect_fd, SHUT_RDWR) == -1) {
-            syslog(LOG_ERR, "Shutdown failed for socket %d: %s", connect_fd, strerror(errno));
+            ERROR("Shutdown failed for socket %d: %s", connect_fd, strerror(errno));
             close(connect_fd);
             close(socket_fd);
             std::exit(exit_kind::failure);
@@ -154,8 +156,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> 
     }
 
     close(socket_fd);
-
-    syslog(LOG_NOTICE, "Work ended!");
+    INFO("Work ended!");
     closelog();
 
     return exit_kind::success;
