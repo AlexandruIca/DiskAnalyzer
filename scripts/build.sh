@@ -1,5 +1,13 @@
 #!/usr/bin/env sh
 
 export CXX=g++
+export CC=gcc
 
-${CXX} -std=c++17 main.cpp
+mkdir build && cd build
+
+cmake \
+    -DENABLE_SANITIZER_ADDRESS=ON \
+    -DENABLE_SANITIZER_UNDEFINED=ON \
+    ..
+
+cmake --build .
