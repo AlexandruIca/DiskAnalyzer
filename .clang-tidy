@@ -1,0 +1,20 @@
+---
+Checks: >
+    *,
+    -fuchsia-*,
+    -google-*,
+    -zircon-*,
+    -abseil-*,
+    -llvm-*,
+    -hicpp-signed-bitwise,
+    -cppcoreguidelines-macro-usage,
+    -cppcoreguidelines-pro-type-union-access,
+    -cppcoreguidelines-avoid-magic-numbers,
+    -readability-magic-numbers,
+    -cppcoreguidelines-pro-type-reinterpret-cast,
+    -cppcoreguidelines-pro-type-vararg,
+    -hicpp-vararg,
+    -android-cloexec-accept,
+WarningsAsErrors: '1'
+HeaderFilterRegex: ''
+FormatStyle: none
