@@ -1,0 +1,6 @@
+bullet_char: '*'
+enum_char: .
+line_width: 120
+separate_ctrl_name_with_space: false
+separate_fn_name_with_space: false
+tab_size: 2
