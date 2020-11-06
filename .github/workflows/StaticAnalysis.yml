@@ -1,0 +1,65 @@
+name: StaticAnalysis
+
+on:
+    push:
+        branches: [ master, dev, gh-actions ]
+
+jobs:
+    build:
+        env:
+            CLANG_VER: 10
+
+        runs-on: ubuntu-latest
+
+        steps:
+        - uses: actions/checkout@v2
+
+        - name: Install dev tools
+          run: |
+              sudo apt update -y
+
+              sudo apt install -y \
+                clang-${CLANG_VER} \
+                clang-format-${CLANG_VER} \
+                clang-tidy-${CLANG_VER} \
+                cmake \
+                ninja-build
+
+        - name: Check versions
+          run: |
+              cmake --version
+              ninja --version
+              clang-${CLANG_VER} --version
+              clang-format-${CLANG_VER} --version
+              clang-tidy-${CLANG_VER} --version
+
+        - uses: actions/setup-python@v2
+          with:
+              python-version: '3.x'
+
+        - name: Install cmake-format
+          run: |
+              python3 -m pip install pyyaml cmake-format
+
+        - name: Build project
+          run: |
+              mkdir -p build && cd build
+
+              export CC=clang-${CLANG_VER}
+              export CXX=clang++-${CLANG_VER}
+
+              cmake -G"Ninja" ..
+              mv compile_commands.json ..
+              cmake --build .
+
+        - name: Run cmake-format
+          run: |
+              ./scripts/check-cmake-format.sh
+
+        - name: Run clang-format
+          run: |
+              CLANG_FORMAT_PATH=/usr/bin/clang-format-${CLANG_VER} ./scripts/clang-format.sh
+
+        - name: Run clang-tidy
+          run: |
+              CLANG_TIDY_PATH=/usr/bin/clang-tidy-${CLANG_VER} ./scripts/clang-tidy.sh
