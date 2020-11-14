@@ -73,7 +73,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> 
     close_output_handles();
     setup_signal_handlers();
 
-    openlog("da_daemon", LOG_PID, LOG_DAEMON);
+    log::open();
 
     INFO("Work started!");
 
@@ -101,7 +101,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> 
     }
 
     INFO("Work ended!");
-    closelog();
+    log::close();
 
     return exit_kind::success;
 }
