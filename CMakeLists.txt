@@ -24,5 +24,6 @@ set_project_warnings(project_warnings)
 enable_sanitizers(project_options)
 enable_coverage(project_options)
 
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/shared/)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/client/)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/server/)
