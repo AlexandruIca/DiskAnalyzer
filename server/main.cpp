@@ -1,10 +1,4 @@
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/types.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include <array>
@@ -16,14 +10,9 @@
 #include <cstring>
 #include <string>
 
+#include "assert.hpp"
 #include "log.hpp"
-
-namespace exit_kind {
-
-constexpr int success = EXIT_SUCCESS;
-constexpr int failure = EXIT_FAILURE;
-
-} // namespace exit_kind
+#include "socket.hpp"
 
 namespace {
 
@@ -36,11 +25,28 @@ auto catch_function(int const signo) -> void
 } // namespace
 
 #define CATCH(sig)                                                                                                     \
-    if(signal(sig, &catch_function) == SIG_ERR) {                                                                      \
-        ERROR("An error occured while setting up signal handler %s!", #sig);                                           \
-        return exit_kind::failure;                                                                                     \
-    }                                                                                                                  \
+    ASSERT_MSG((signal(sig, &catch_function) != SIG_ERR),                                                              \
+               "An error occured while setting up signal handler " #sig "!");                                          \
     static_cast<void>(0)
+
+auto close_output_handles() -> void
+{
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+}
+
+auto setup_signal_handlers() -> void
+{
+    CATCH(SIGCHLD); // NOLINT
+    CATCH(SIGQUIT); // NOLINT
+    CATCH(SIGILL);  // NOLINT
+    CATCH(SIGSEGV); // NOLINT
+    CATCH(SIGTERM); // NOLINT
+    CATCH(SIGABRT); // NOLINT
+    CATCH(SIGFPE);  // NOLINT
+    CATCH(SIGHUP);  // NOLINT
+}
 
 auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> int
 {
@@ -48,9 +54,8 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> 
     pid_t sid = 0;
 
     pid = fork();
-    if(pid < 0) {
-        std::exit(exit_kind::failure);
-    }
+    ASSERT(pid >= 0);
+
     // If we got a good PID, then
     // we can exit the parent process
     if(pid > 0) {
@@ -61,101 +66,40 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> 
 
     // Create a new SID for the child process
     sid = setsid();
-    if(sid < 0) {
-        std::exit(exit_kind::failure);
-    }
 
-    if((chdir("/")) < 0) {
-        std::exit(exit_kind::failure);
-    }
+    ASSERT(sid >= 0);
+    ASSERT(chdir("/") >= 0);
 
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
+    close_output_handles();
+    setup_signal_handlers();
 
     openlog("da_daemon", LOG_PID, LOG_DAEMON);
 
-    CATCH(SIGCHLD); // NOLINT
-    CATCH(SIGQUIT); // NOLINT
-    CATCH(SIGILL);  // NOLINT
-    CATCH(SIGSEGV); // NOLINT
-    CATCH(SIGTERM); // NOLINT
-    CATCH(SIGABRT); // NOLINT
-    CATCH(SIGFPE);  // NOLINT
-    CATCH(SIGHUP);  // NOLINT
-
     INFO("Work started!");
 
-    sockaddr_in socket_address{};
-
-    int socket_fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-
-    if(socket_fd == -1) {
-        ERROR("Cannot create socket!");
-        std::exit(exit_kind::failure);
-    }
-
-    std::memset(&socket_address, 0, sizeof(socket_address));
-
-    socket_address.sin_family = AF_INET;
-    socket_address.sin_port = htons(5678);
-    socket_address.sin_addr.s_addr = htonl(INADDR_ANY);
-
-    if(bind(socket_fd, reinterpret_cast<sockaddr*>(&socket_address), sizeof(socket_address)) == -1) {
-        ERROR("Bind failed: %s", strerror(errno));
-        close(socket_fd);
-        std::exit(exit_kind::failure);
-    }
+    net::socket srv{ net::socket::create_tcp_stream() };
+    ASSERT_MSG(srv.ok(), "Cannot create socket!");
+    ASSERT_MSG(srv.create_server(), "`bind` failed!");
 
     constexpr int max_num_connections = 10;
-    if(listen(socket_fd, max_num_connections) == -1) {
-        ERROR("Listen failed: %s", strerror(errno));
-        close(socket_fd);
-        std::exit(exit_kind::failure);
-    }
+    ASSERT_MSG(srv.listen(max_num_connections), "`listen` failed!");
 
     while(true) {
-        int const connect_fd = accept(socket_fd, nullptr, nullptr);
+        net::socket client{ srv.accept() };
+        ASSERT_MSG(client.ok(), "`accept` failed!");
 
-        if(connect_fd < 0) {
-            ERROR("Accept failed: %s", strerror(errno));
-            close(socket_fd);
-            std::exit(exit_kind::failure);
+        INFO("Accepted socket %d!", client.get_fd());
+
+        try {
+            auto const msg = client.wait_for_message();
+            INFO("Received from client: %s", msg.c_str());
+            client.send_message("Hello from server!");
         }
-
-        INFO("Accepted socket %d!", connect_fd);
-
-        std::array<std::byte, 1024> buf{};
-        bool still_reading = true;
-
-        while(still_reading) {
-            ssize_t num_bytes_read = read(connect_fd, buf.data(), buf.size());
-
-            if(num_bytes_read < 0) {
-                ERROR("Couln't read from socket %d: %s", connect_fd, strerror(errno));
-                close(connect_fd);
-                close(socket_fd);
-                std::exit(exit_kind::failure);
-            }
-            if(num_bytes_read == 0) {
-                still_reading = false;
-            }
-            else {
-                INFO("Read %ld bytes!", num_bytes_read);
-            }
+        catch(std::exception const& e) {
+            INFO("%s", e.what());
         }
-
-        if(shutdown(connect_fd, SHUT_RDWR) == -1) {
-            ERROR("Shutdown failed for socket %d: %s", connect_fd, strerror(errno));
-            close(connect_fd);
-            close(socket_fd);
-            std::exit(exit_kind::failure);
-        }
-
-        close(connect_fd);
     }
 
-    close(socket_fd);
     INFO("Work ended!");
     closelog();
 

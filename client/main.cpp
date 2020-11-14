@@ -1,47 +1,44 @@
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
-
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-
+#include <iostream>
+#include <numeric>
 #include <string>
+#include <vector>
 
-namespace exit_kind {
+#include "config.hpp"
+#include "socket.hpp"
 
-constexpr int success = EXIT_SUCCESS;
-constexpr int failure = EXIT_FAILURE;
-
-} // namespace exit_kind
-
-auto main([[maybe_unused]] int const argc, [[maybe_unused]] char const* argv[]) noexcept -> int
+auto main(int const argc, char const* argv[]) noexcept -> int
 {
-    sockaddr_in socket_address{};
-    int const socket_fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+    std::vector<std::string> args{ argv + 1, argv + argc };
+    std::string to_send{};
 
-    if(socket_fd == -1) {
-        perror("Cannot create socket!");
+    for(auto const& s : args) {
+        to_send += s + ' ';
+    }
+
+    net::socket connection{ net::socket::create_tcp_stream() };
+
+    if(!connection.ok()) {
+        perror("Can't create socket!");
         std::exit(exit_kind::failure);
     }
 
-    std::memset(&socket_address, 0, sizeof(socket_address));
-
-    socket_address.sin_family = AF_INET;
-    socket_address.sin_port = htons(5678);
-    inet_pton(AF_INET, "127.0.0.1", &socket_address.sin_addr);
-
-    if(connect(socket_fd, reinterpret_cast<sockaddr*>(&socket_address), sizeof(socket_address)) == -1) {
-        perror("Connect failed!");
-        close(socket_fd);
+    if(!connection.connect_to_server()) {
+        perror("`connect` failed!");
         std::exit(exit_kind::failure);
     }
 
-    std::string msg{ "Hello server" };
-    write(socket_fd, msg.c_str(), msg.size());
+    try {
+        connection.send_message(to_send);
+        auto const received = connection.wait_for_message();
+        std::cout << "Received from server: " << received << std::endl;
+    }
+    catch(std::exception const& e) {
+        std::cout << e.what() << std::endl;
+    }
 
-    close(socket_fd);
     return exit_kind::success;
 }
