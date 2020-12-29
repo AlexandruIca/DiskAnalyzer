@@ -7,13 +7,31 @@
 #include <string>
 #include <vector>
 
+#include <dirent.h>
+#include <unistd.h>
+
 #include "config.hpp"
 #include "socket.hpp"
+
+[[nodiscard]] auto get_absolute_path(std::string const& path) -> std::string
+{
+    std::array<char, PATH_MAX + 1> abs_dir{};
+    realpath(path.c_str(), abs_dir.data());
+    return std::string{ abs_dir.data() };
+}
 
 auto main(int const argc, char const* argv[]) noexcept -> int
 {
     std::vector<std::string> args{ argv + 1, argv + argc };
-    std::string to_send{};
+
+    if(args.empty()) {
+        std::cout << "Please specify a directory to be analyzed!" << std::endl;
+        return 0;
+    }
+
+    std::string to_send{ get_absolute_path(args.front()) };
+
+    std::cout << "Analyzing: " << to_send << std::endl;
 
     for(auto const& s : args) {
         to_send += s + ' ';
