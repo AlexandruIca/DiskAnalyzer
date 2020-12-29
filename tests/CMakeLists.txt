@@ -1,6 +1,7 @@
 function(build_standalone_test TEST_NAME)
   add_executable(${TEST_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/${TEST_NAME}.cpp)
   target_link_libraries(${TEST_NAME} PRIVATE project::options project::warnings project::server_utils)
+  target_compile_options(${TEST_NAME} PRIVATE "-pthread")
   target_include_directories(${TEST_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../server/)
   add_test(${TEST_NAME} ${TEST_NAME})
 endfunction()
