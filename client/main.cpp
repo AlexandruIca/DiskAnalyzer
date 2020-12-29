@@ -30,13 +30,6 @@ auto main(int const argc, char const* argv[]) noexcept -> int
     }
 
     std::string to_send{ get_absolute_path(args.front()) };
-
-    std::cout << "Analyzing: " << to_send << std::endl;
-
-    for(auto const& s : args) {
-        to_send += s + ' ';
-    }
-
     net::socket connection{ net::socket::create_tcp_stream() };
 
     if(!connection.ok()) {

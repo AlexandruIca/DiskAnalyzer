@@ -1,13 +1,17 @@
+#include <dirent.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <array>
 #include <cerrno>
 #include <csignal>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <string>
 
 #include "assert.hpp"
@@ -46,6 +50,58 @@ auto setup_signal_handlers() -> void
     CATCH(SIGABRT); // NOLINT
     CATCH(SIGFPE);  // NOLINT
     CATCH(SIGHUP);  // NOLINT
+}
+
+[[nodiscard]] auto analyze_dir(std::string const& path) -> std::string
+{
+    using namespace std::string_literals;
+
+    std::deque<std::string> dirs{};
+    std::size_t size = 0;
+    std::size_t num_files = 0;
+
+    dirent* dp = nullptr;
+    DIR* dfd = nullptr;
+
+    dirs.push_back(path);
+
+    while(!dirs.empty()) {
+        std::string const dir = dirs.front();
+        dirs.pop_front();
+
+        dfd = opendir(dir.c_str());
+
+        if(dfd == nullptr) {
+            return "Can't open"s + "'" + dir + "'";
+        }
+
+        std::string filename{};
+
+        while(static_cast<bool>(dp = readdir(dfd))) {
+            filename = dir + '/' + std::string{ static_cast<char const*>(dp->d_name) };
+            struct stat stbuf = {};
+
+            if(stat(filename.c_str(), &stbuf) < 0) {
+                ERROR("Unable to stat file: %s", filename.c_str());
+                continue;
+            }
+
+            if((stbuf.st_mode & S_IFMT) == S_IFDIR) {
+                std::string dir_name{ static_cast<char const*>(dp->d_name) };
+
+                if(!(dir_name == "." || dir_name == "..")) {
+                    dirs.push_back(std::move(dir_name));
+                }
+
+                continue;
+            }
+
+            size += static_cast<std::size_t>(stbuf.st_size);
+            ++num_files;
+        }
+    }
+
+    return "Analyzed "s + std::to_string(num_files) + " files, " + std::to_string(size) + " bytes";
 }
 
 auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> int
@@ -93,7 +149,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) noexcept -> 
         try {
             auto const msg = client.wait_for_message();
             INFO("Received from client: %s", msg.c_str());
-            client.send_message("Hello from server!");
+            client.send_message(analyze_dir(msg));
         }
         catch(std::exception const& e) {
             INFO("%s", e.what());
