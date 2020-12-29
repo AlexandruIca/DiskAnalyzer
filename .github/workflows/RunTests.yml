@@ -1,0 +1,52 @@
+name: RunTests
+
+on:
+    push:
+        branches: [ master, dev, gh-actions ]
+
+jobs:
+    build:
+        env:
+            GCC_VER: 10
+
+        runs-on: ubuntu-latest
+
+        steps:
+        - uses: actions/checkout@v2
+
+        - name: Install dev tools
+          run: |
+              sudo apt update -y
+
+              sudo apt install -y \
+                gcc-${GCC_VER} \
+                g++-${GCC_VER} \
+                cmake \
+                ninja-build
+
+        - name: Check versions
+          run: |
+              cmake --version
+              ninja --version
+              g++-${GCC_VER} --version
+
+        - name: Build tests
+          run: |
+              mkdir -p build && cd build
+
+              export CC=gcc-${GCC_VER}
+              export CXX=g++-${GCC_VER}
+
+              cmake \
+                -G"Ninja" \
+                -DENABLE_SANITIZER_ADDRESS=ON \
+                -DENABLE_SANITIZER_UNDEFINED=ON \
+                -DBUILD_TESTS=ON \
+                ..
+
+              cmake --build .
+
+        - name: Run tests
+          run: |
+              cd build
+              ctest -V -E 'simple_cli_test'
