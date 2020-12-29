@@ -48,7 +48,7 @@ jobs:
               export CC=clang-${CLANG_VER}
               export CXX=clang++-${CLANG_VER}
 
-              cmake -G"Ninja" ..
+              cmake -G"Ninja" -DBUILD_TESTS=ON ..
               mv compile_commands.json ..
               cmake --build .
 
