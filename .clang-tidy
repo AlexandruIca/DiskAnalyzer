@@ -15,6 +15,7 @@ Checks: >
     -cppcoreguidelines-pro-type-vararg,
     -hicpp-vararg,
     -android-cloexec-accept,
+    -modernize-avoid-bind,
 WarningsAsErrors: '1'
 HeaderFilterRegex: ''
 FormatStyle: none
