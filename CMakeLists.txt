@@ -27,3 +27,10 @@ enable_coverage(project_options)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/shared/)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/client/)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/server/)
+
+option(BUILD_TESTS "Build the tests that come with `da`" OFF)
+
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests/)
+endif()
