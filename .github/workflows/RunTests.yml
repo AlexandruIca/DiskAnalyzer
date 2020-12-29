@@ -7,7 +7,7 @@ on:
 jobs:
     build:
         env:
-            GCC_VER: 11
+            GCC_VER: 10
 
         runs-on: ubuntu-latest
 
